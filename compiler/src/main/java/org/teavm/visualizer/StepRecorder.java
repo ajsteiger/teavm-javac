@@ -15,6 +15,8 @@
  */
 package org.teavm.visualizer;
 
+import java.util.IdentityHashMap;
+
 /**
  * <p>Runtime recorder used by the pure-browser Java visualizer.</p>
  *
@@ -49,6 +51,8 @@ public final class StepRecorder {
     private static int depth;
     private static int stepCount;
     private static boolean truncated;
+    private static final IdentityHashMap<Object, Integer> objectIds = new IdentityHashMap<>();
+    private static int nextObjectId = 1;
 
     private StepRecorder() {
     }
@@ -145,7 +149,7 @@ public final class StepRecorder {
             jsCaptureVar(name, value.toString());
             return;
         }
-        int id = System.identityHashCode(value);
+        int id = getObjectId(value);
         Class<?> cls = value.getClass();
         StringBuilder sb = new StringBuilder("@").append(Integer.toUnsignedString(id))
                 .append(":").append(cls.getSimpleName()).append("{");
@@ -172,7 +176,7 @@ public final class StepRecorder {
                     || fval instanceof Boolean || fval instanceof Character) {
                 sb.append(fval);
             } else {
-                sb.append("@").append(Integer.toUnsignedString(System.identityHashCode(fval)));
+                sb.append("@").append(Integer.toUnsignedString(getObjectId(fval)));
             }
         }
         sb.append("}");
@@ -270,6 +274,17 @@ public final class StepRecorder {
         stepCount = 0;
         truncated = false;
         depth = 0;
+        objectIds.clear();
+        nextObjectId = 1;
+    }
+
+    private static int getObjectId(Object value) {
+        var id = objectIds.get(value);
+        if (id == null) {
+            id = nextObjectId++;
+            objectIds.put(value, id);
+        }
+        return id;
     }
 
     // -----------------------------------------------------------------

@@ -221,12 +221,7 @@ public final class Compiler {
 
     @JSExport
     public boolean compile() {
-        initCompiler();
-        try {
-            return compiler.simpleCompile();
-        } finally {
-            compiler = null;
-        }
+        return compile(false);
     }
 
     @JSExport
@@ -254,10 +249,19 @@ public final class Compiler {
 
     @JSExport
     public boolean generateVisualizer(WebAssemblyCompilationOptions options) {
-        if (!compile()) {
+        if (!compile(true)) {
             return false;
         }
         return generateWebAssembly(options, true);
+    }
+
+    private boolean compile(boolean debug) {
+        initCompiler(debug);
+        try {
+            return compiler.simpleCompile();
+        } finally {
+            compiler = null;
+        }
     }
 
     private boolean generateWebAssembly(WebAssemblyCompilationOptions options, boolean visualizer) {
@@ -292,12 +296,19 @@ public final class Compiler {
         new JCLPlugin().install(teavm);
         teavm.setEntryPoint(mainClass);
         if (visualizer) {
-            teavm.add(new StepInstrumentationTransformer(mainClass));
+            teavm.add(new StepInstrumentationTransformer(getVisualizerClassPrefix(mainClass)));
         }
         target.setObfuscated(false);
         target.setDebugInfoLocation(WasmDebugInfoLocation.EMBEDDED);
         target.setDebugInfo(true);
-        teavm.build(new MemoryBuildTarget(wasmOutputFiles), outputName);
+        if (visualizer) {
+            StepInstrumentationTransformer.enableVisualizerReflection();
+        }
+        try {
+            teavm.build(new MemoryBuildTarget(wasmOutputFiles), outputName);
+        } finally {
+            StepInstrumentationTransformer.disableVisualizerReflection();
+        }
         if (!diagnosticListeners.isEmpty()) {
             for (var problem : teavm.getProblemProvider().getProblems()) {
                 var wrapper = new TeaVMDiagnostic(problem);
@@ -309,6 +320,11 @@ public final class Compiler {
         return teavm.getProblemProvider().getSevereProblems().isEmpty();
     }
 
+    private static String getVisualizerClassPrefix(String mainClass) {
+        int index = mainClass.lastIndexOf('.');
+        return index >= 0 ? mainClass.substring(0, index + 1) : mainClass;
+    }
+
     @JSExport
     public ListenerRegistration onDiagnostic(CompilerDiagnosticListener diagnosticListener) {
         var reg = new DiagnosticListenerRegistration(diagnosticListeners, diagnosticListener);
@@ -316,12 +332,14 @@ public final class Compiler {
         return reg;
     }
 
-    private void initCompiler() {
+    private void initCompiler(boolean debug) {
         if (compiler != null) {
             return;
         }
         var context = new Context();
-        Options.instance(context).put(Option.G, Option.G.primaryName);
+        if (debug) {
+            Options.instance(context).put(Option.G, Option.G.primaryName);
+        }
         context.put(DiagnosticListener.class, new DiagnosticListenerImpl(diagnosticListeners));
         var fileManager = new FileManagerImpl(sourceFiles, classFiles, sdkFiles, outputFiles);
         context.put(JavaFileManager.class, fileManager);

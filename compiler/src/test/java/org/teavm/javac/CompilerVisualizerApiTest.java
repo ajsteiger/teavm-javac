@@ -15,15 +15,11 @@
  */
 package org.teavm.javac;
 
-import static org.junit.Assert.assertNotNull;
-import java.lang.reflect.Method;
 import org.junit.Test;
 
 public class CompilerVisualizerApiTest {
     @Test
     public void generateVisualizerIsAvailable() throws NoSuchMethodException {
-        Method method = Compiler.class.getMethod("generateVisualizer", WebAssemblyCompilationOptions.class);
-
-        assertNotNull(method);
+        Compiler.class.getMethod("generateVisualizer", WebAssemblyCompilationOptions.class);
     }
 }

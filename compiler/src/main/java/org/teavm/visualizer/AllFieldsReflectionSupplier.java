@@ -29,8 +29,8 @@ import org.teavm.model.FieldReader;
  * visualizer heap panel.
  *
  * <p>The supplier is registered in {@code core} so browser-hosted compilers can
- * bundle it, but it returns no fields until {@link StepInstrumentationTransformer}
- * has been constructed for a visualizer build.</p>
+ * bundle it, but it returns no fields until visualizer reflection is enabled
+ * for a visualizer build.</p>
  */
 public class AllFieldsReflectionSupplier implements ReflectionSupplier {
     @Override

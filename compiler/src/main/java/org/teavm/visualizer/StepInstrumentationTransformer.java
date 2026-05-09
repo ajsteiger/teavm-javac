@@ -97,6 +97,9 @@ public class StepInstrumentationTransformer implements ClassHolderTransformer {
      */
     public StepInstrumentationTransformer(String targetClassPrefix) {
         this.targetClassPrefix = targetClassPrefix;
+    }
+
+    public static void enableVisualizerReflection() {
         visualizerReflectionEnabled = true;
     }
 
@@ -104,7 +107,7 @@ public class StepInstrumentationTransformer implements ClassHolderTransformer {
         return visualizerReflectionEnabled;
     }
 
-    static void disableVisualizerReflectionForTests() {
+    public static void disableVisualizerReflection() {
         visualizerReflectionEnabled = false;
     }
 
@@ -175,12 +178,12 @@ public class StepInstrumentationTransformer implements ClassHolderTransformer {
         }
 
         DefinitionExtractor defExtractor = new DefinitionExtractor();
-        TextLocation lastLoc = null;
         for (int bi = 0; bi < program.basicBlockCount(); bi++) {
             BasicBlock block = program.basicBlockAt(bi);
             if (block == null) {
                 continue;
             }
+            TextLocation lastLoc = null;
 
             // At block entry: start with vars inherited from the dominator chain (covers
             // loop-header phis becoming visible in the loop body), then add this block's
