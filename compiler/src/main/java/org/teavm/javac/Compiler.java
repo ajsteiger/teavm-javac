@@ -17,7 +17,9 @@
 package org.teavm.javac;
 
 import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Options;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -49,6 +51,7 @@ import org.teavm.parsing.CompositeClassHolderSource;
 import org.teavm.parsing.resource.CompositeResourceProvider;
 import org.teavm.parsing.resource.ResourceProvider;
 import org.teavm.platform.plugin.PlatformPlugin;
+import org.teavm.visualizer.StepInstrumentationTransformer;
 import org.teavm.vm.TeaVMBuilder;
 import org.teavm.vm.TeaVMOptimizationLevel;
 import static com.sun.tools.javac.comp.CompileStates.CompileState;
@@ -246,6 +249,18 @@ public final class Compiler {
 
     @JSExport
     public boolean generateWebAssembly(WebAssemblyCompilationOptions options) {
+        return generateWebAssembly(options, false);
+    }
+
+    @JSExport
+    public boolean generateVisualizer(WebAssemblyCompilationOptions options) {
+        if (!compile()) {
+            return false;
+        }
+        return generateWebAssembly(options, true);
+    }
+
+    private boolean generateWebAssembly(WebAssemblyCompilationOptions options, boolean visualizer) {
         var outputName = options.getOutputName() != null && !JSObjects.isUndefined(options.getOutputName())
                 ? options.getOutputName().stringValue()
                 : "app";
@@ -276,6 +291,9 @@ public final class Compiler {
         new PlatformPlugin().install(teavm);
         new JCLPlugin().install(teavm);
         teavm.setEntryPoint(mainClass);
+        if (visualizer) {
+            teavm.add(new StepInstrumentationTransformer(mainClass));
+        }
         target.setObfuscated(false);
         target.setDebugInfoLocation(WasmDebugInfoLocation.EMBEDDED);
         target.setDebugInfo(true);
@@ -303,6 +321,7 @@ public final class Compiler {
             return;
         }
         var context = new Context();
+        Options.instance(context).put(Option.G, Option.G.primaryName);
         context.put(DiagnosticListener.class, new DiagnosticListenerImpl(diagnosticListeners));
         var fileManager = new FileManagerImpl(sourceFiles, classFiles, sdkFiles, outputFiles);
         context.put(JavaFileManager.class, fileManager);

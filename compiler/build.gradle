@@ -22,6 +22,7 @@ dependencies {
     compileOnly libs.teavm.core
     implementation libs.teavm.tooling
     implementation libs.asm.core
+    testImplementation "junit:junit:4.13.2"
     classlibInput libs.teavm.classlib
     classlibInput libs.teavm.jso
     classlibInput libs.teavm.jso.apis
@@ -117,6 +118,9 @@ def prepareTeaVMClassLib = tasks.register("prepareTeaVMClassLib", Copy) {
         include "org/teavm/backend/wasm/WasmRuntime*.class"
         include "org/teavm/backend/wasm/WasmHeap*.class"
         include "com/jcraft/jzlib/**"
+    }
+    from(sourceSets.main.output) {
+        include "org/teavm/visualizer/StepRecorder.class"
     }
     from(repackCldr) {
         eachFile {
