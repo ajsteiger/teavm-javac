@@ -1,6 +1,6 @@
 [versions]
 
-teavm = "0.13.1"
+teavm = "0.14.0-SNAPSHOT"
 asm = "9.8"
 
 [libraries]

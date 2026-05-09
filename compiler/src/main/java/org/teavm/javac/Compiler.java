@@ -17,7 +17,9 @@
 package org.teavm.javac;
 
 import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Options;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -49,6 +51,7 @@ import org.teavm.parsing.CompositeClassHolderSource;
 import org.teavm.parsing.resource.CompositeResourceProvider;
 import org.teavm.parsing.resource.ResourceProvider;
 import org.teavm.platform.plugin.PlatformPlugin;
+import org.teavm.visualizer.StepInstrumentationTransformer;
 import org.teavm.vm.TeaVMBuilder;
 import org.teavm.vm.TeaVMOptimizationLevel;
 import static com.sun.tools.javac.comp.CompileStates.CompileState;
@@ -218,12 +221,7 @@ public final class Compiler {
 
     @JSExport
     public boolean compile() {
-        initCompiler();
-        try {
-            return compiler.simpleCompile();
-        } finally {
-            compiler = null;
-        }
+        return compile(false);
     }
 
     @JSExport
@@ -246,6 +244,27 @@ public final class Compiler {
 
     @JSExport
     public boolean generateWebAssembly(WebAssemblyCompilationOptions options) {
+        return generateWebAssembly(options, false);
+    }
+
+    @JSExport
+    public boolean generateVisualizer(WebAssemblyCompilationOptions options) {
+        if (!compile(true)) {
+            return false;
+        }
+        return generateWebAssembly(options, true);
+    }
+
+    private boolean compile(boolean debug) {
+        initCompiler(debug);
+        try {
+            return compiler.simpleCompile();
+        } finally {
+            compiler = null;
+        }
+    }
+
+    private boolean generateWebAssembly(WebAssemblyCompilationOptions options, boolean visualizer) {
         var outputName = options.getOutputName() != null && !JSObjects.isUndefined(options.getOutputName())
                 ? options.getOutputName().stringValue()
                 : "app";
@@ -276,10 +295,20 @@ public final class Compiler {
         new PlatformPlugin().install(teavm);
         new JCLPlugin().install(teavm);
         teavm.setEntryPoint(mainClass);
+        if (visualizer) {
+            teavm.add(new StepInstrumentationTransformer(getVisualizerClassPrefix(mainClass)));
+        }
         target.setObfuscated(false);
         target.setDebugInfoLocation(WasmDebugInfoLocation.EMBEDDED);
         target.setDebugInfo(true);
-        teavm.build(new MemoryBuildTarget(wasmOutputFiles), outputName);
+        if (visualizer) {
+            StepInstrumentationTransformer.enableVisualizerReflection();
+        }
+        try {
+            teavm.build(new MemoryBuildTarget(wasmOutputFiles), outputName);
+        } finally {
+            StepInstrumentationTransformer.disableVisualizerReflection();
+        }
         if (!diagnosticListeners.isEmpty()) {
             for (var problem : teavm.getProblemProvider().getProblems()) {
                 var wrapper = new TeaVMDiagnostic(problem);
@@ -291,6 +320,11 @@ public final class Compiler {
         return teavm.getProblemProvider().getSevereProblems().isEmpty();
     }
 
+    private static String getVisualizerClassPrefix(String mainClass) {
+        int index = mainClass.lastIndexOf('.');
+        return index >= 0 ? mainClass.substring(0, index + 1) : mainClass;
+    }
+
     @JSExport
     public ListenerRegistration onDiagnostic(CompilerDiagnosticListener diagnosticListener) {
         var reg = new DiagnosticListenerRegistration(diagnosticListeners, diagnosticListener);
@@ -298,11 +332,14 @@ public final class Compiler {
         return reg;
     }
 
-    private void initCompiler() {
+    private void initCompiler(boolean debug) {
         if (compiler != null) {
             return;
         }
         var context = new Context();
+        if (debug) {
+            Options.instance(context).put(Option.G, Option.G.primaryName);
+        }
         context.put(DiagnosticListener.class, new DiagnosticListenerImpl(diagnosticListeners));
         var fileManager = new FileManagerImpl(sourceFiles, classFiles, sdkFiles, outputFiles);
         context.put(JavaFileManager.class, fileManager);
