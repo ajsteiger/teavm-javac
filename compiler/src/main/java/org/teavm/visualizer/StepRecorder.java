@@ -149,6 +149,10 @@ public final class StepRecorder {
             jsCaptureVar(name, value.toString());
             return;
         }
+        if (value instanceof Object[]) {
+            jsCaptureVar(name, objectArrayToString((Object[]) value));
+            return;
+        }
         int id = getObjectId(value);
         Class<?> cls = value.getClass();
         StringBuilder sb = new StringBuilder("@").append(Integer.toUnsignedString(id))
@@ -181,6 +185,25 @@ public final class StepRecorder {
         }
         sb.append("}");
         jsCaptureVar(name, sb.toString());
+    }
+
+    private static String objectArrayToString(Object[] value) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < value.length; i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            Object item = value[i];
+            if (item == null) {
+                sb.append("null");
+            } else if (item instanceof String || item instanceof Number
+                    || item instanceof Boolean || item instanceof Character) {
+                sb.append(item);
+            } else {
+                sb.append("@").append(Integer.toUnsignedString(getObjectId(item)));
+            }
+        }
+        return sb.append("]").toString();
     }
 
     /**
